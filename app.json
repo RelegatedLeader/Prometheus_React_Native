@@ -1,28 +1,22 @@
 {
   "expo": {
     "name": "Prometheus",
-    "slug": "Prometheus",
+    "slug": "prometheus",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true
     },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+    "android": {},
+    "web": {},
+    "extra": {
+      "eas": {
+        "projectId": "805f6c2e-cb04-45e4-9fc8-51c0f4136a87"
       }
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    }
+    "newArchEnabled": true,
+    "owner": "relegatedleader"
   }
 }
