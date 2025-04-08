@@ -8,11 +8,10 @@ import {
   Platform,
   Dimensions,
   Button,
-  Clipboard,
 } from "react-native";
 import { useTheme } from "react-native-elements";
-import * as Localization from "expo-localization";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from "axios";
 
 export default function SettingsScreen({
   navigation,
@@ -21,31 +20,27 @@ export default function SettingsScreen({
   userHash,
 }) {
   const { theme } = useTheme();
-  const [useSystemLanguage, setUseSystemLanguage] = useState(true);
-  const [selectedLanguage, setSelectedLanguage] = useState("en");
   const [enableNotifications, setEnableNotifications] = useState(true);
   const [autoDeleteMessages, setAutoDeleteMessages] = useState(false);
 
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const systemLanguage = await AsyncStorage.getItem("useSystemLanguage");
-        const language = await AsyncStorage.getItem("selectedLanguage");
+        // Load dark mode setting
+        const savedDayMode = await AsyncStorage.getItem("isDayMode");
+        if (savedDayMode !== null) {
+          const isDay = JSON.parse(savedDayMode);
+          setIsDayMode(isDay);
+        }
+
+        // Load notification setting
         const notifications = await AsyncStorage.getItem("enableNotifications");
-        const autoDelete = await AsyncStorage.getItem("autoDeleteMessages");
-        if (systemLanguage !== null) {
-          setUseSystemLanguage(JSON.parse(systemLanguage));
-        }
-        if (language) {
-          setSelectedLanguage(language);
-        } else {
-          const systemLocale = Localization.locale.split("-")[0];
-          setSelectedLanguage(systemLocale);
-          await AsyncStorage.setItem("selectedLanguage", systemLocale);
-        }
         if (notifications !== null) {
           setEnableNotifications(JSON.parse(notifications));
         }
+
+        // Load auto-delete setting
+        const autoDelete = await AsyncStorage.getItem("autoDeleteMessages");
         if (autoDelete !== null) {
           setAutoDeleteMessages(JSON.parse(autoDelete));
         }
@@ -54,26 +49,59 @@ export default function SettingsScreen({
       }
     };
     loadSettings();
-  }, []);
+  }, [setIsDayMode]);
 
-  const toggleSystemLanguage = async () => {
-    const newValue = !useSystemLanguage;
-    setUseSystemLanguage(newValue);
-    await AsyncStorage.setItem("useSystemLanguage", JSON.stringify(newValue));
-    if (newValue) {
-      const systemLocale = Localization.locale.split("-")[0];
-      setSelectedLanguage(systemLocale);
-      await AsyncStorage.setItem("selectedLanguage", systemLocale);
-    }
-  };
+  // Auto-delete messages logic
+  useEffect(() => {
+    const deleteOldMessages = async () => {
+      if (!autoDeleteMessages || !userHash) return;
 
-  const handleLanguageChange = async (language) => {
-    setSelectedLanguage(language);
-    await AsyncStorage.setItem("selectedLanguage", language);
-    if (useSystemLanguage) {
-      setUseSystemLanguage(false);
-      await AsyncStorage.setItem("useSystemLanguage", "false");
+      try {
+        const response = await axios.post(
+          "http://192.168.1.111:8000/api/get_messages/",
+          {
+            user_hash: userHash,
+            contact_hash: "", // Empty contact_hash to fetch all messages
+          },
+          { timeout: 10000 }
+        );
+
+        const messages = response.data.messages;
+        const now = new Date();
+        const messagesToDelete = messages.filter((message) => {
+          const messageDate = new Date(message.timestamp);
+          const diffInHours = (now - messageDate) / (1000 * 60 * 60);
+          return diffInHours >= 24;
+        });
+
+        for (const message of messagesToDelete) {
+          await axios.post(
+            "http://192.168.1.111:8000/api/delete_message/",
+            {
+              user_hash: userHash,
+              message_id: message.id,
+            },
+            { timeout: 10000 }
+          );
+        }
+      } catch (error) {
+        console.error("Failed to auto-delete messages:", error);
+      }
+    };
+
+    if (autoDeleteMessages) {
+      // Check every hour for messages to delete
+      const interval = setInterval(deleteOldMessages, 60 * 60 * 1000);
+      // Run immediately on toggle
+      deleteOldMessages();
+      return () => clearInterval(interval);
     }
+  }, [autoDeleteMessages, userHash]);
+
+  const toggleDarkMode = async () => {
+    const newDayMode = !isDayMode;
+    setIsDayMode(newDayMode);
+    await AsyncStorage.setItem("isDayMode", JSON.stringify(newDayMode));
   };
 
   const toggleNotifications = async () => {
@@ -86,11 +114,6 @@ export default function SettingsScreen({
     const newValue = !autoDeleteMessages;
     setAutoDeleteMessages(newValue);
     await AsyncStorage.setItem("autoDeleteMessages", JSON.stringify(newValue));
-  };
-
-  const copyHash = async () => {
-    await Clipboard.setString(userHash);
-    Alert.alert("Success", "Your hash has been copied to the clipboard");
   };
 
   return (
@@ -106,52 +129,11 @@ export default function SettingsScreen({
         </Text>
         <Switch
           value={!isDayMode}
-          onValueChange={() => setIsDayMode(!isDayMode)}
+          onValueChange={toggleDarkMode}
           trackColor={{ false: "#767577", true: theme.colors.button }}
           thumbColor={isDayMode ? "#f4f3f4" : "#f4f3f4"}
         />
       </View>
-      <View style={styles.setting}>
-        <Text style={[styles.settingText, { color: theme.colors.text }]}>
-          Use System Language
-        </Text>
-        <Switch
-          value={useSystemLanguage}
-          onValueChange={toggleSystemLanguage}
-          trackColor={{ false: "#767577", true: theme.colors.button }}
-          thumbColor={useSystemLanguage ? "#f4f3f4" : "#f4f3f4"}
-        />
-      </View>
-      {!useSystemLanguage && (
-        <View style={styles.setting}>
-          <Text style={[styles.settingText, { color: theme.colors.text }]}>
-            Select Language
-          </Text>
-          <View style={styles.languageOptions}>
-            <Button
-              title="English"
-              onPress={() => handleLanguageChange("en")}
-              color={
-                selectedLanguage === "en" ? theme.colors.button : "#767577"
-              }
-            />
-            <Button
-              title="Spanish"
-              onPress={() => handleLanguageChange("es")}
-              color={
-                selectedLanguage === "es" ? theme.colors.button : "#767577"
-              }
-            />
-            <Button
-              title="French"
-              onPress={() => handleLanguageChange("fr")}
-              color={
-                selectedLanguage === "fr" ? theme.colors.button : "#767577"
-              }
-            />
-          </View>
-        </View>
-      )}
       <View style={styles.setting}>
         <Text style={[styles.settingText, { color: theme.colors.text }]}>
           Enable Notifications
@@ -174,22 +156,6 @@ export default function SettingsScreen({
           thumbColor={autoDeleteMessages ? "#f4f3f4" : "#f4f3f4"}
         />
       </View>
-      <View style={styles.setting}>
-        <Text style={[styles.settingText, { color: theme.colors.text }]}>
-          Your Hash:
-        </Text>
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <Text style={[styles.hashText, { color: theme.colors.text }]}>
-            {userHash}
-          </Text>
-          <Button
-            title="Copy"
-            onPress={copyHash}
-            color={theme.colors.button}
-            containerStyle={{ marginLeft: 10 }}
-          />
-        </View>
-      </View>
     </View>
   );
 }
@@ -199,31 +165,24 @@ const { width, height } = Dimensions.get("window");
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: width * 0.05,
-    paddingTop: Platform.OS === "ios" ? height * 0.05 : height * 0.03,
+    paddingHorizontal: Math.min(width * 0.05, 20), // Cap padding at 20px
+    paddingTop:
+      Platform.OS === "ios"
+        ? Math.min(height * 0.05, 40)
+        : Math.min(height * 0.03, 30),
   },
   headerText: {
-    fontSize: width * 0.05,
+    fontSize: Math.min(width * 0.05, 24), // Cap font size at 24px
     fontWeight: "bold",
-    marginBottom: height * 0.03,
+    marginBottom: Math.min(height * 0.03, 20),
   },
   setting: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginVertical: height * 0.015,
+    marginVertical: Math.min(height * 0.015, 10),
   },
   settingText: {
-    fontSize: width * 0.04,
-  },
-  languageOptions: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: height * 0.01,
-  },
-  hashText: {
-    fontSize: width * 0.035,
-    flex: 1,
-    flexWrap: "wrap",
+    fontSize: Math.min(width * 0.04, 18), // Cap font size at 18px
   },
 });

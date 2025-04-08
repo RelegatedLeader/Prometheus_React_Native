@@ -251,8 +251,11 @@ const { width, height } = Dimensions.get("window");
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
-    padding: width * 0.05,
+    paddingHorizontal: Math.min(width * 0.05, 20),
+    paddingTop:
+      Platform.OS === "ios"
+        ? Math.min(height * 0.05, 40)
+        : Math.min(height * 0.03, 30),
   },
   input: {
     borderWidth: 1,

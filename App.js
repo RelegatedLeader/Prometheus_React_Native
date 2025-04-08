@@ -1,13 +1,13 @@
+import "react-native-gesture-handler"; // Must be at the very top
 import React, { useState, useEffect } from "react";
-import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import { Button, ThemeProvider } from "react-native-elements";
-import { View, Alert, Platform } from "react-native";
+import { View, Alert, Platform, TouchableOpacity } from "react-native";
 import { Text, Provider as PaperProvider } from "react-native-paper";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
-// import * as Notifications from 'expo-notifications'; // Comment out push notifications
 import UserContext from "./UserContext";
 import LoginScreen from "./screens/LoginScreen";
 import MessagesScreen from "./screens/MessagesScreen";
@@ -39,21 +39,25 @@ const nightTheme = {
   },
 };
 
-// Comment out push notification setup
-// Notifications.setNotificationHandler({
-//   handleNotification: async () => ({
-//     shouldShowAlert: true,
-//     shouldPlaySound: true,
-//     shouldSetBadge: true,
-//   }),
-// });
+// Define a static navigation theme to avoid dynamic issues
+const navigationTheme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    primary: dayTheme.colors.button,
+    background: dayTheme.colors.background,
+    card: dayTheme.colors.background,
+    text: "#000",
+    border: dayTheme.colors.border,
+  },
+};
 
-const CustomHeader = ({ navigation, route, isDayMode, setIsDayMode }) => {
+// Custom header component with drawer toggle button
+const CustomHeader = ({ navigation, route, isDayMode }) => {
   return (
     <View
       style={{
         flexDirection: "row",
-        justifyContent: "space-between",
         alignItems: "center",
         padding: 10,
         backgroundColor: isDayMode
@@ -61,17 +65,25 @@ const CustomHeader = ({ navigation, route, isDayMode, setIsDayMode }) => {
           : nightTheme.colors.background,
       }}
     >
-      <Button
-        title="☰"
-        onPress={() => navigation.openDrawer()}
-        color={isDayMode ? dayTheme.colors.button : nightTheme.colors.button}
-        containerStyle={{ marginRight: 10 }}
-      />
-      <Button
-        title={`Switch to ${isDayMode ? "Night" : "Day"} Mode`}
-        onPress={() => setIsDayMode(!isDayMode)}
-        color={isDayMode ? dayTheme.colors.button : nightTheme.colors.button}
-      />
+      <TouchableOpacity onPress={() => navigation.openDrawer()}>
+        <Text
+          style={{
+            fontSize: 24,
+            color: isDayMode ? "#000" : nightTheme.colors.text,
+            marginRight: 10,
+          }}
+        >
+          ☰
+        </Text>
+      </TouchableOpacity>
+      <Text
+        style={{
+          fontSize: 20,
+          color: isDayMode ? "#000" : nightTheme.colors.text,
+        }}
+      >
+        {route.name}
+      </Text>
     </View>
   );
 };
@@ -79,17 +91,14 @@ const CustomHeader = ({ navigation, route, isDayMode, setIsDayMode }) => {
 const MainStackNavigator = ({ isDayMode, setIsDayMode, userHash }) => (
   <Stack.Navigator
     screenOptions={({ navigation, route }) => ({
-      header:
-        route.name === "Chat"
-          ? undefined
-          : () => (
-              <CustomHeader
-                navigation={navigation}
-                route={route}
-                isDayMode={isDayMode}
-                setIsDayMode={setIsDayMode}
-              />
-            ),
+      headerShown: route.name !== "Chat", // Hide header for Chat screen
+      header: ({ navigation, route }) => (
+        <CustomHeader
+          navigation={navigation}
+          route={route}
+          isDayMode={isDayMode}
+        />
+      ),
       gestureEnabled: route.name !== "Messages" || !userHash,
     })}
   >
@@ -110,72 +119,42 @@ export default function App() {
   const [isDayMode, setIsDayMode] = useState(true);
   const [userHash, setUserHash] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  // const [notificationToken, setNotificationToken] = useState(null); // Comment out push notifications
 
   useEffect(() => {
-    const loadUserHash = async () => {
+    const loadUserHashAndSettings = async () => {
       try {
         const hash = await AsyncStorage.getItem("userHash");
         if (hash) {
           setUserHash(hash);
         }
+
+        // Load dark mode setting
+        const savedDayMode = await AsyncStorage.getItem("isDayMode");
+        if (savedDayMode !== null) {
+          const isDay = JSON.parse(savedDayMode);
+          setIsDayMode(isDay);
+        }
       } catch (error) {
-        console.error("Failed to load userHash:", error);
+        console.error("Failed to load userHash or settings:", error);
       } finally {
         setIsLoading(false);
       }
     };
-    loadUserHash();
+    loadUserHashAndSettings();
   }, []);
-
-  // Comment out push notification registration
-  // useEffect(() => {
-  //   const registerForPushNotifications = async () => {
-  //     try {
-  //       const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  //       let finalStatus = existingStatus;
-  //       if (existingStatus !== 'granted') {
-  //         const { status } = await Notifications.requestPermissionsAsync();
-  //         finalStatus = status;
-  //       }
-  //       if (finalStatus !== 'granted') {
-  //         console.log('Failed to get push token for push notification!');
-  //         return;
-  //       }
-  //       const token = (await Notifications.getExpoPushTokenAsync()).data;
-  //       setNotificationToken(token);
-
-  //       if (userHash) {
-  //         try {
-  //           await axios.post('http://192.168.1.111:8000/api/register_push_token/', {
-  //             user_hash: userHash,
-  //             push_token: token,
-  //           }, { timeout: 10000 });
-  //         } catch (error) {
-  //           console.error('Failed to register push token with backend:', error);
-  //         }
-  //       }
-  //     } catch (error) {
-  //       console.error('Failed to register for push notifications:', error);
-  //     }
-  //   };
-
-  //   registerForPushNotifications();
-
-  //   if (Platform.OS === 'android') {
-  //     Notifications.setNotificationChannelAsync('default', {
-  //       name: 'default',
-  //       importance: Notifications.AndroidImportance.MAX,
-  //       vibrationPattern: [0, 250, 250, 250],
-  //       lightColor: '#FF231F7C',
-  //     });
-  //   }
-  // }, [userHash]);
 
   if (isLoading) {
     return (
-      <View>
-        <Text>Loading...</Text>
+      <View
+        style={{
+          backgroundColor: isDayMode
+            ? dayTheme.colors.background
+            : nightTheme.colors.background,
+        }}
+      >
+        <Text style={{ color: isDayMode ? "#000" : nightTheme.colors.text }}>
+          Loading...
+        </Text>
       </View>
     );
   }
@@ -184,7 +163,7 @@ export default function App() {
     <UserContext.Provider value={{ userHash, setUserHash }}>
       <ThemeProvider theme={isDayMode ? dayTheme : nightTheme}>
         <PaperProvider>
-          <NavigationContainer>
+          <NavigationContainer theme={navigationTheme}>
             <Stack.Navigator>
               {userHash ? (
                 <Stack.Screen name="MainApp" options={{ headerShown: false }}>
@@ -192,6 +171,7 @@ export default function App() {
                     <Drawer.Navigator
                       initialRouteName="Main"
                       screenOptions={{
+                        headerShown: false, // Keep header disabled for Drawer.Navigator
                         drawerStyle: {
                           backgroundColor: isDayMode
                             ? dayTheme.colors.background
@@ -199,7 +179,7 @@ export default function App() {
                           width: 250,
                         },
                         drawerLabelStyle: {
-                          color: isDayMode ? "#000" : nightTheme.colors.text, // Use gold text in dark mode
+                          color: isDayMode ? "#000" : nightTheme.colors.text,
                           fontSize: 16,
                         },
                       }}
@@ -208,7 +188,17 @@ export default function App() {
                         name="Main"
                         options={{
                           title: "Messages",
-                          drawerIcon: () => <Text>📩</Text>,
+                          drawerIcon: () => (
+                            <Text
+                              style={{
+                                color: isDayMode
+                                  ? "#000"
+                                  : nightTheme.colors.text,
+                              }}
+                            >
+                              📩
+                            </Text>
+                          ),
                         }}
                       >
                         {(props) => (
@@ -225,7 +215,17 @@ export default function App() {
                         component={AddContactScreen}
                         options={{
                           title: "Add Contact",
-                          drawerIcon: () => <Text>➕</Text>,
+                          drawerIcon: () => (
+                            <Text
+                              style={{
+                                color: isDayMode
+                                  ? "#000"
+                                  : nightTheme.colors.text,
+                              }}
+                            >
+                              ➕
+                            </Text>
+                          ),
                         }}
                       />
                       <Drawer.Screen
@@ -233,7 +233,17 @@ export default function App() {
                         component={PendingInvitesScreen}
                         options={{
                           title: "Pending Invites",
-                          drawerIcon: () => <Text>📬</Text>,
+                          drawerIcon: () => (
+                            <Text
+                              style={{
+                                color: isDayMode
+                                  ? "#000"
+                                  : nightTheme.colors.text,
+                              }}
+                            >
+                              📬
+                            </Text>
+                          ),
                         }}
                       />
                       <Drawer.Screen
@@ -241,14 +251,34 @@ export default function App() {
                         component={ContactsScreen}
                         options={{
                           title: "Contacts",
-                          drawerIcon: () => <Text>👥</Text>,
+                          drawerIcon: () => (
+                            <Text
+                              style={{
+                                color: isDayMode
+                                  ? "#000"
+                                  : nightTheme.colors.text,
+                              }}
+                            >
+                              👥
+                            </Text>
+                          ),
                         }}
                       />
                       <Drawer.Screen
                         name="Settings"
                         options={{
                           title: "Settings",
-                          drawerIcon: () => <Text>⚙️</Text>,
+                          drawerIcon: () => (
+                            <Text
+                              style={{
+                                color: isDayMode
+                                  ? "#000"
+                                  : nightTheme.colors.text,
+                              }}
+                            >
+                              ⚙️
+                            </Text>
+                          ),
                         }}
                       >
                         {(props) => (
@@ -264,7 +294,17 @@ export default function App() {
                         name="Logout"
                         options={{
                           title: "Logout",
-                          drawerIcon: () => <Text>🚪</Text>,
+                          drawerIcon: () => (
+                            <Text
+                              style={{
+                                color: isDayMode
+                                  ? "#000"
+                                  : nightTheme.colors.text,
+                              }}
+                            >
+                              🚪
+                            </Text>
+                          ),
                         }}
                       >
                         {(props) => (
@@ -314,11 +354,14 @@ export default function App() {
                                   Alert.alert("Error", "Failed to logout");
                                 }
                               }}
-                              color={
-                                isDayMode
+                              buttonStyle={{
+                                backgroundColor: isDayMode
                                   ? dayTheme.colors.button
-                                  : nightTheme.colors.button
-                              }
+                                  : nightTheme.colors.button,
+                              }}
+                              titleStyle={{
+                                color: isDayMode ? "#000" : "#FFF",
+                              }}
                             />
                           </View>
                         )}

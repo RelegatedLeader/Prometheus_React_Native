@@ -95,8 +95,11 @@ const { width, height } = Dimensions.get("window");
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: width * 0.05,
-    paddingTop: Platform.OS === "ios" ? height * 0.05 : height * 0.03,
+    paddingHorizontal: Math.min(width * 0.05, 20),
+    paddingTop:
+      Platform.OS === "ios"
+        ? Math.min(height * 0.05, 40)
+        : Math.min(height * 0.03, 30),
   },
   headerText: {
     fontSize: width * 0.05,
