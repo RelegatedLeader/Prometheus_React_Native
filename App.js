@@ -6,6 +6,7 @@ import { createDrawerNavigator } from "@react-navigation/drawer";
 import { Button, ThemeProvider } from "react-native-elements";
 import { View, Alert, Platform, TouchableOpacity } from "react-native";
 import { Text, Provider as PaperProvider } from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context"; // Ensure SafeAreaView is imported
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import UserContext from "./UserContext";
@@ -52,39 +53,51 @@ const navigationTheme = {
   },
 };
 
-// Custom header component with drawer toggle button
+// Custom header component with drawer toggle button (with fix for hamburger menu)
 const CustomHeader = ({ navigation, route, isDayMode }) => {
   return (
-    <View
+    <SafeAreaView
+      edges={["top"]} // Ensure the top edge respects the status bar
       style={{
-        flexDirection: "row",
-        alignItems: "center",
-        padding: 10,
         backgroundColor: isDayMode
           ? dayTheme.colors.background
           : nightTheme.colors.background,
       }}
     >
-      <TouchableOpacity onPress={() => navigation.openDrawer()}>
-        <Text
-          style={{
-            fontSize: 24,
-            color: isDayMode ? "#000" : nightTheme.colors.text,
-            marginRight: 10,
-          }}
-        >
-          ☰
-        </Text>
-      </TouchableOpacity>
-      <Text
+      <View
         style={{
-          fontSize: 20,
-          color: isDayMode ? "#000" : nightTheme.colors.text,
+          flexDirection: "row",
+          alignItems: "center",
+          paddingHorizontal: 10,
+          paddingVertical: 10,
         }}
       >
-        {route.name}
-      </Text>
-    </View>
+        <TouchableOpacity
+          onPress={() => navigation.openDrawer()}
+          style={{
+            padding: 10, // Increase touchable area
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 24,
+              color: isDayMode ? "#000" : nightTheme.colors.text,
+            }}
+          >
+            ☰
+          </Text>
+        </TouchableOpacity>
+        <Text
+          style={{
+            fontSize: 20,
+            color: isDayMode ? "#000" : nightTheme.colors.text,
+            marginLeft: 10,
+          }}
+        >
+          {route.name}
+        </Text>
+      </View>
+    </SafeAreaView>
   );
 };
 
